@@ -3,22 +3,26 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
+import { signIn } from "@/lib/supabase/auth";
 
 export default function AdminLoginPage() {
   const router = useRouter();
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    // DEMO ONLY: replace with Supabase Auth (supabase.auth.signInWithPassword)
-    // once a real Supabase project is connected. See README for setup steps.
-    if (password === "abagroup2026") {
-      sessionStorage.setItem("aba_admin", "1");
-      router.push("/admin/dashboard");
-    } else {
-      setError(true);
+    setLoading(true);
+    setError("");
+    const { error: authError } = await signIn(email, password);
+    setLoading(false);
+    if (authError) {
+      setError("Email немесе құпия сөз қате");
+      return;
     }
+    router.push("/admin/dashboard");
   }
 
   return (
@@ -29,18 +33,25 @@ export default function AdminLoginPage() {
         <p className="text-sm text-ink-soft mb-6">ABA Group басқару тақтасы</p>
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => { setEmail(e.target.value); setError(""); }}
+            className="px-4 py-3 rounded-xl border border-line text-sm text-center"
+          />
+          <input
             type="password"
             placeholder="Құпия сөз"
             value={password}
-            onChange={(e) => { setPassword(e.target.value); setError(false); }}
+            onChange={(e) => { setPassword(e.target.value); setError(""); }}
             className="px-4 py-3 rounded-xl border border-line text-sm text-center"
           />
-          {error && <p className="text-xs text-coral font-semibold">Құпия сөз қате</p>}
-          <button type="submit" className="bg-deep-green text-white rounded-full py-3 font-bold">
-            Кіру
+          {error && <p className="text-xs text-coral font-semibold">{error}</p>}
+          <button disabled={loading} type="submit" className="bg-deep-green text-white rounded-full py-3 font-bold disabled:opacity-50">
+            {loading ? "..." : "Кіру"}
           </button>
         </form>
-        <p className="text-xs text-ink-soft mt-5">Демо құпия сөз: abagroup2026</p>
+        <p className="text-xs text-ink-soft mt-5">Supabase Authentication бөлімінде құрылған admin аккаунтпен кіріңіз.</p>
       </div>
     </div>
   );

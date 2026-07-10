@@ -1,7 +1,6 @@
 "use client";
 
 import { createContext, useContext, useState, ReactNode } from "react";
-import { PRODUCTS } from "../data/products";
 
 interface CartContextType {
   cart: Record<number, number>;
@@ -10,7 +9,6 @@ interface CartContextType {
   removeFromCart: (id: number) => void;
   clearCart: () => void;
   cartCount: number;
-  cartTotal: number;
 }
 
 const CartContext = createContext<CartContextType | null>(null);
@@ -45,13 +43,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }
 
   const cartCount = Object.values(cart).reduce((a, b) => a + b, 0);
-  const cartTotal = Object.entries(cart).reduce((sum, [id, qty]) => {
-    const p = PRODUCTS.find((x) => x.id === Number(id));
-    return sum + (p ? p.price * qty : 0);
-  }, 0);
 
   return (
-    <CartContext.Provider value={{ cart, addToCart, changeQty, removeFromCart, clearCart, cartCount, cartTotal }}>
+    <CartContext.Provider value={{ cart, addToCart, changeQty, removeFromCart, clearCart, cartCount }}>
       {children}
     </CartContext.Provider>
   );

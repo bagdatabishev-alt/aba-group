@@ -4,11 +4,12 @@ import Link from "next/link";
 import Logo from "@/components/Logo";
 import ProductCard from "@/components/ProductCard";
 import { useLang } from "@/lib/i18n/LanguageContext";
-import { PRODUCTS } from "@/lib/data/products";
+import { useProducts } from "@/lib/products/ProductsContext";
 
 export default function HomePage() {
   const { t } = useLang();
-  const featured = PRODUCTS.slice(0, 8);
+  const { products, loading } = useProducts();
+  const featured = products.slice(0, 8);
 
   return (
     <>
@@ -42,11 +43,17 @@ export default function HomePage() {
           <div className="text-xs font-extrabold uppercase tracking-wide text-blue mb-3">{t("cat_eyebrow")}</div>
           <h2 className="font-display text-3xl md:text-4xl font-extrabold text-deep-green tracking-tight">{t("cat_title")}</h2>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {featured.map((p) => (
-            <ProductCard key={p.id} product={p} />
-          ))}
-        </div>
+        {loading ? (
+          <div className="text-center py-16 text-ink-soft text-sm">Жүктелуде...</div>
+        ) : featured.length === 0 ? (
+          <div className="text-center py-16 text-ink-soft text-sm">Әлі өнім қосылмаған.</div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {featured.map((p) => (
+              <ProductCard key={p.id} product={p} />
+            ))}
+          </div>
+        )}
       </section>
     </>
   );

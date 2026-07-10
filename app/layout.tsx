@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { LanguageProvider } from "@/lib/i18n/LanguageContext";
 import { CartProvider } from "@/lib/cart/CartContext";
+import { ProductsProvider } from "@/lib/products/ProductsContext";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
@@ -27,11 +28,13 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex flex-col">
         <LanguageProvider>
-          <CartProvider>
-            <Navbar />
-            <main className="flex-1">{children}</main>
-            <Footer />
-          </CartProvider>
+          <ProductsProvider>
+            <CartProvider>
+              <Navbar />
+              <main className="flex-1">{children}</main>
+              <Footer />
+            </CartProvider>
+          </ProductsProvider>
         </LanguageProvider>
       </body>
     </html>

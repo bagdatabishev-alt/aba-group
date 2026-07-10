@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Product } from "@/lib/data/products";
+import { UiProduct } from "@/lib/supabase/products";
 import { getCategory } from "@/lib/data/categories";
 import { useLang } from "@/lib/i18n/LanguageContext";
 import { useCart } from "@/lib/cart/CartContext";
@@ -10,7 +10,7 @@ function fmt(n: number) {
   return n.toLocaleString("ru-RU") + " ₸";
 }
 
-export default function ProductCard({ product }: { product: Product }) {
+export default function ProductCard({ product }: { product: UiProduct }) {
   const { lang, t } = useLang();
   const { addToCart } = useCart();
   const category = getCategory(product.cat);

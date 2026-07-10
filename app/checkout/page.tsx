@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLang } from "@/lib/i18n/LanguageContext";
 import { useCart } from "@/lib/cart/CartContext";
-import { getProduct } from "@/lib/data/products";
+import { useProducts } from "@/lib/products/ProductsContext";
 
 function fmt(n: number) {
   return n.toLocaleString("ru-RU") + " ₸";
@@ -12,7 +12,8 @@ function fmt(n: number) {
 
 export default function CheckoutPage() {
   const { lang, t } = useLang();
-  const { cart, cartTotal, clearCart } = useCart();
+  const { cart, clearCart } = useCart();
+  const { products } = useProducts();
   const router = useRouter();
 
   const [loading, setLoading] = useState(false);
@@ -20,6 +21,10 @@ export default function CheckoutPage() {
   const [form, setForm] = useState({ name: "", phone: "", email: "", country: "Қазақстан", city: "", address: "", notes: "" });
 
   const ids = Object.keys(cart).map(Number);
+  const cartTotal = ids.reduce((sum, id) => {
+    const p = products.find((x) => x.id === id);
+    return sum + (p ? p.price * cart[id] : 0);
+  }, 0);
 
   if (ids.length === 0 && orderNumber === null) {
     return (
@@ -37,7 +42,7 @@ export default function CheckoutPage() {
     e.preventDefault();
     setLoading(true);
     const items = ids.map((id) => {
-      const p = getProduct(id)!;
+      const p = products.find((x) => x.id === id)!;
       return { id, name: p.name[lang], price: p.price, qty: cart[id] };
     });
     try {
@@ -59,7 +64,7 @@ export default function CheckoutPage() {
   if (orderNumber !== null) {
     return (
       <div className="text-center py-24 px-5">
-        <div className="w-16 h-16 rounded-full bg-green/10 text-green text-3xl flex items-center justify-center mx-auto mb-4">✓</div>
+        <div className="w-16 h-16 rounded-full bg-green/10 text-green text-3xl flex items-center justify-center mx-auto mb-4.5">✓</div>
         <h3 className="font-extrabold text-xl mb-2">{t("os_title")}</h3>
         <p className="text-ink-soft mb-6">{t("os_text").replace("{id}", String(orderNumber))}</p>
         <button onClick={() => router.push("/")} className="bg-deep-green text-white rounded-full px-6 py-3 font-bold">
@@ -75,7 +80,8 @@ export default function CheckoutPage() {
 
       <div className="bg-bg-gray rounded-2xl p-5 mb-6">
         {ids.map((id) => {
-          const p = getProduct(id)!;
+          const p = products.find((x) => x.id === id);
+          if (!p) return null;
           return (
             <div key={id} className="flex justify-between text-sm py-1.5">
               <span>{p.name[lang]} × {cart[id]}</span>

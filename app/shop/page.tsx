@@ -5,10 +5,11 @@ import { useSearchParams, useRouter } from "next/navigation";
 import ProductCard from "@/components/ProductCard";
 import { useLang } from "@/lib/i18n/LanguageContext";
 import { CATEGORIES } from "@/lib/data/categories";
-import { PRODUCTS } from "@/lib/data/products";
+import { useProducts } from "@/lib/products/ProductsContext";
 
 function ShopContent() {
   const { lang, t } = useLang();
+  const { products, loading } = useProducts();
   const router = useRouter();
   const searchParams = useSearchParams();
   const catParam = searchParams.get("cat") || "all";
@@ -33,7 +34,7 @@ function ShopContent() {
   }
 
   const filtered = useMemo(() => {
-    let list = PRODUCTS.filter((p) => catParam === "all" || p.cat === catParam);
+    let list = products.filter((p) => catParam === "all" || p.cat === catParam);
     const q = search.trim().toLowerCase();
     if (q) list = list.filter((p) => p.name[lang].toLowerCase().includes(q) || p.desc[lang].toLowerCase().includes(q));
     if (priceFilter === "1") list = list.filter((p) => p.price <= 50000);
@@ -44,7 +45,7 @@ function ShopContent() {
     else if (sort === "2") list.sort((a, b) => b.price - a.price);
     else if (sort === "3") list.sort((a, b) => b.id - a.id);
     return list;
-  }, [catParam, search, priceFilter, sort, lang]);
+  }, [catParam, search, priceFilter, sort, lang, products]);
 
   return (
     <section className="py-14 px-5 max-w-6xl mx-auto">
@@ -97,7 +98,9 @@ function ShopContent() {
         </select>
       </div>
 
-      {filtered.length === 0 ? (
+      {loading ? (
+        <div className="text-center py-16 text-ink-soft text-sm">Жүктелуде...</div>
+      ) : filtered.length === 0 ? (
         <div className="text-center py-16 text-ink-soft">
           <div className="text-4xl mb-3.5">🔍</div>
           <h3 className="font-bold text-lg mb-1">{t("empty_title")}</h3>

@@ -1,10 +1,10 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { getProduct } from "@/lib/data/products";
 import { getCategory } from "@/lib/data/categories";
 import { useLang } from "@/lib/i18n/LanguageContext";
 import { useCart } from "@/lib/cart/CartContext";
+import { useProducts } from "@/lib/products/ProductsContext";
 
 function fmt(n: number) {
   return n.toLocaleString("ru-RU") + " ₸";
@@ -15,9 +15,14 @@ export default function ProductPage() {
   const router = useRouter();
   const { lang, t } = useLang();
   const { addToCart } = useCart();
+  const { products, loading } = useProducts();
 
   const id = Number(params.id);
-  const product = getProduct(id);
+  const product = products.find((p) => p.id === id);
+
+  if (loading) {
+    return <div className="text-center py-24 text-ink-soft text-sm">Жүктелуде...</div>;
+  }
 
   if (!product) {
     return (

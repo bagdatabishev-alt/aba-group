@@ -3,20 +3,25 @@
 import { useRouter } from "next/navigation";
 import { useCart } from "@/lib/cart/CartContext";
 import { useLang } from "@/lib/i18n/LanguageContext";
-import { getProduct } from "@/lib/data/products";
+import { useProducts } from "@/lib/products/ProductsContext";
 
 function fmt(n: number) {
   return n.toLocaleString("ru-RU") + " ₸";
 }
 
 export default function CartDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { cart, changeQty, removeFromCart, cartTotal } = useCart();
+  const { cart, changeQty, removeFromCart } = useCart();
+  const { products } = useProducts();
   const { lang, t } = useLang();
   const router = useRouter();
 
   if (!open) return null;
 
   const ids = Object.keys(cart).map(Number);
+  const cartTotal = ids.reduce((sum, id) => {
+    const p = products.find((x) => x.id === id);
+    return sum + (p ? p.price * cart[id] : 0);
+  }, 0);
 
   return (
     <>
@@ -35,7 +40,7 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
             </div>
           ) : (
             ids.map((id) => {
-              const p = getProduct(id);
+              const p = products.find((x) => x.id === id);
               if (!p) return null;
               const qty = cart[id];
               return (
