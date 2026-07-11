@@ -11,6 +11,13 @@ import {
   DbProduct,
   ProductInput,
 } from "@/lib/supabase/products";
+import { fetchOrders, updateOrderStatus, deleteOrder, DbOrder } from "@/lib/supabase/orders";
+import {
+  fetchContactRequests,
+  updateContactStatus,
+  deleteContactRequest,
+  DbContactRequest,
+} from "@/lib/supabase/contact";
 import { CATEGORIES } from "@/lib/data/categories";
 
 const EMPTY_FORM: ProductInput = {
@@ -29,15 +36,37 @@ const EMPTY_FORM: ProductInput = {
   desc_en: "",
 };
 
+const ORDER_STATUSES = [
+  { value: "new", label: "Жаңа" },
+  { value: "confirmed", label: "Расталды" },
+  { value: "shipped", label: "Жіберілді" },
+  { value: "delivered", label: "Жеткізілді" },
+  { value: "cancelled", label: "Болдырылмады" },
+];
+
+type Tab = "products" | "orders" | "contacts";
+
 export default function AdminDashboard() {
   const router = useRouter();
   const [ready, setReady] = useState(false);
+  const [tab, setTab] = useState<Tab>("products");
+
+  // Products state
   const [products, setProducts] = useState<DbProduct[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingProducts, setLoadingProducts] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<ProductInput>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+
+  // Orders state
+  const [orders, setOrders] = useState<DbOrder[]>([]);
+  const [loadingOrders, setLoadingOrders] = useState(true);
+  const [expandedOrder, setExpandedOrder] = useState<number | null>(null);
+
+  // Contact requests state
+  const [contacts, setContacts] = useState<DbContactRequest[]>([]);
+  const [loadingContacts, setLoadingContacts] = useState(true);
 
   useEffect(() => {
     (async () => {
@@ -48,14 +77,27 @@ export default function AdminDashboard() {
       }
       setReady(true);
       loadProducts();
+      loadOrders();
+      loadContacts();
     })();
   }, [router]);
 
   async function loadProducts() {
-    setLoading(true);
-    const data = await fetchAllProductsForAdmin();
-    setProducts(data);
-    setLoading(false);
+    setLoadingProducts(true);
+    setProducts(await fetchAllProductsForAdmin());
+    setLoadingProducts(false);
+  }
+
+  async function loadOrders() {
+    setLoadingOrders(true);
+    setOrders(await fetchOrders());
+    setLoadingOrders(false);
+  }
+
+  async function loadContacts() {
+    setLoadingContacts(true);
+    setContacts(await fetchContactRequests());
+    setLoadingContacts(false);
   }
 
   function openAdd() {
@@ -97,10 +139,32 @@ export default function AdminDashboard() {
     loadProducts();
   }
 
-  async function handleDelete(id: number) {
+  async function handleDeleteProduct(id: number) {
     if (!confirm("Бұл өнімді жоюға сенімдісіз бе?")) return;
     await deleteProduct(id);
     loadProducts();
+  }
+
+  async function handleOrderStatus(id: number, status: string) {
+    await updateOrderStatus(id, status);
+    loadOrders();
+  }
+
+  async function handleDeleteOrder(id: number) {
+    if (!confirm("Бұл тапсырысты жоюға сенімдісіз бе?")) return;
+    await deleteOrder(id);
+    loadOrders();
+  }
+
+  async function handleContactStatus(id: number, status: string) {
+    await updateContactStatus(id, status);
+    loadContacts();
+  }
+
+  async function handleDeleteContact(id: number) {
+    if (!confirm("Бұл хабарламаны жоюға сенімдісіз бе?")) return;
+    await deleteContactRequest(id);
+    loadContacts();
   }
 
   async function handleSignOut() {
@@ -112,66 +176,209 @@ export default function AdminDashboard() {
 
   const totalStock = products.reduce((s, p) => s + (p.stock || 0), 0);
   const totalValue = products.reduce((s, p) => s + (p.stock || 0) * Number(p.price), 0);
+  const newOrdersCount = orders.filter((o) => o.status === "new").length;
+  const newContactsCount = contacts.filter((c) => c.status === "new").length;
 
   return (
     <section className="py-10 px-5 max-w-6xl mx-auto">
-      <div className="flex justify-between items-center mb-8 flex-wrap gap-3">
+      <div className="flex justify-between items-center mb-6 flex-wrap gap-3">
         <h1 className="text-2xl font-extrabold">Dashboard</h1>
         <div className="flex gap-3">
-          <button onClick={openAdd} className="bg-deep-green text-white rounded-full px-5 py-2.5 font-bold text-sm">
-            + Өнім қосу
-          </button>
+          {tab === "products" && (
+            <button onClick={openAdd} className="bg-deep-green text-white rounded-full px-5 py-2.5 font-bold text-sm">
+              + Өнім қосу
+            </button>
+          )}
           <button onClick={handleSignOut} className="text-sm font-bold text-coral">
             Шығу
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
-        <StatCard label="Өнімдер саны" value={String(products.length)} />
-        <StatCard label="Категориялар" value={String(CATEGORIES.length)} />
-        <StatCard label="Жалпы қор" value={String(totalStock)} />
-        <StatCard label="Қор құны" value={totalValue.toLocaleString("ru-RU") + " ₸"} />
+      <div className="flex gap-2 mb-8 border-b border-line">
+        <TabButton active={tab === "products"} onClick={() => setTab("products")}>
+          Өнімдер ({products.length})
+        </TabButton>
+        <TabButton active={tab === "orders"} onClick={() => setTab("orders")}>
+          Тапсырыстар {newOrdersCount > 0 && <Badge count={newOrdersCount} />}
+        </TabButton>
+        <TabButton active={tab === "contacts"} onClick={() => setTab("contacts")}>
+          Хабарламалар {newContactsCount > 0 && <Badge count={newContactsCount} />}
+        </TabButton>
       </div>
 
-      <div className="bg-white border border-line rounded-2xl overflow-hidden">
-        <div className="px-5 py-4 border-b border-line font-bold">Өнімдер тізімі</div>
-        {loading ? (
-          <div className="p-8 text-center text-ink-soft text-sm">Жүктелуде...</div>
-        ) : products.length === 0 ? (
-          <div className="p-8 text-center text-ink-soft text-sm">Әлі өнім жоқ. &quot;+ Өнім қосу&quot; басыңыз.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-bg-gray text-ink-soft text-xs uppercase">
-                <tr>
-                  <th className="text-left px-5 py-3">SKU</th>
-                  <th className="text-left px-5 py-3">Атауы</th>
-                  <th className="text-left px-5 py-3">Санат</th>
-                  <th className="text-left px-5 py-3">Баға</th>
-                  <th className="text-left px-5 py-3">Қор</th>
-                  <th className="text-left px-5 py-3"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {products.map((p) => (
-                  <tr key={p.id} className="border-t border-line">
-                    <td className="px-5 py-3 text-ink-soft">{p.sku}</td>
-                    <td className="px-5 py-3 font-semibold">{p.name_kz}</td>
-                    <td className="px-5 py-3">{p.category_id}</td>
-                    <td className="px-5 py-3">{Number(p.price).toLocaleString("ru-RU")} ₸</td>
-                    <td className="px-5 py-3">{p.stock}</td>
-                    <td className="px-5 py-3 text-right whitespace-nowrap">
-                      <button onClick={() => openEdit(p)} className="text-blue font-bold text-xs mr-3">Өңдеу</button>
-                      <button onClick={() => handleDelete(p.id)} className="text-coral font-bold text-xs">Жою</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {tab === "products" && (
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <StatCard label="Өнімдер саны" value={String(products.length)} />
+            <StatCard label="Категориялар" value={String(CATEGORIES.length)} />
+            <StatCard label="Жалпы қор" value={String(totalStock)} />
+            <StatCard label="Қор құны" value={totalValue.toLocaleString("ru-RU") + " ₸"} />
           </div>
-        )}
-      </div>
+
+          <div className="bg-white border border-line rounded-2xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-line font-bold">Өнімдер тізімі</div>
+            {loadingProducts ? (
+              <div className="p-8 text-center text-ink-soft text-sm">Жүктелуде...</div>
+            ) : products.length === 0 ? (
+              <div className="p-8 text-center text-ink-soft text-sm">Әлі өнім жоқ. &quot;+ Өнім қосу&quot; басыңыз.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-bg-gray text-ink-soft text-xs uppercase">
+                    <tr>
+                      <th className="text-left px-5 py-3">SKU</th>
+                      <th className="text-left px-5 py-3">Атауы</th>
+                      <th className="text-left px-5 py-3">Санат</th>
+                      <th className="text-left px-5 py-3">Баға</th>
+                      <th className="text-left px-5 py-3">Қор</th>
+                      <th className="text-left px-5 py-3"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {products.map((p) => (
+                      <tr key={p.id} className="border-t border-line">
+                        <td className="px-5 py-3 text-ink-soft">{p.sku}</td>
+                        <td className="px-5 py-3 font-semibold">{p.name_kz}</td>
+                        <td className="px-5 py-3">{p.category_id}</td>
+                        <td className="px-5 py-3">{Number(p.price).toLocaleString("ru-RU")} ₸</td>
+                        <td className="px-5 py-3">{p.stock}</td>
+                        <td className="px-5 py-3 text-right whitespace-nowrap">
+                          <button onClick={() => openEdit(p)} className="text-blue font-bold text-xs mr-3">Өңдеу</button>
+                          <button onClick={() => handleDeleteProduct(p.id)} className="text-coral font-bold text-xs">Жою</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {tab === "orders" && (
+        <div className="bg-white border border-line rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-line font-bold">Тапсырыстар тізімі</div>
+          {loadingOrders ? (
+            <div className="p-8 text-center text-ink-soft text-sm">Жүктелуде...</div>
+          ) : orders.length === 0 ? (
+            <div className="p-8 text-center text-ink-soft text-sm">Әлі тапсырыс жоқ.</div>
+          ) : (
+            <div className="divide-y divide-line">
+              {orders.map((o) => (
+                <div key={o.id} className="p-5">
+                  <div
+                    className="flex justify-between items-start cursor-pointer flex-wrap gap-2"
+                    onClick={() => setExpandedOrder(expandedOrder === o.id ? null : o.id)}
+                  >
+                    <div>
+                      <div className="font-bold text-sm mb-1">
+                        #{o.order_number} — {o.customer_name}
+                        <StatusPill status={o.status} labels={ORDER_STATUSES} />
+                      </div>
+                      <div className="text-xs text-ink-soft">
+                        {o.phone} · {o.city} · {new Date(o.created_at).toLocaleString("ru-RU")}
+                      </div>
+                    </div>
+                    <div className="font-extrabold text-deep-green">{Number(o.total).toLocaleString("ru-RU")} ₸</div>
+                  </div>
+
+                  {expandedOrder === o.id && (
+                    <div className="mt-4 bg-bg-gray rounded-xl p-4 text-sm">
+                      <div className="grid grid-cols-2 gap-2 mb-3">
+                        <div><b className="text-ink-soft text-xs block">Email</b>{o.email || "—"}</div>
+                        <div><b className="text-ink-soft text-xs block">Ел</b>{o.country || "—"}</div>
+                        <div className="col-span-2"><b className="text-ink-soft text-xs block">Мекенжай</b>{o.address}</div>
+                        {o.notes && <div className="col-span-2"><b className="text-ink-soft text-xs block">Ескертпе</b>{o.notes}</div>}
+                      </div>
+                      <div className="mb-3">
+                        <b className="text-ink-soft text-xs block mb-1">Тауарлар</b>
+                        {o.items?.map((it, i) => (
+                          <div key={i} className="flex justify-between text-xs py-0.5">
+                            <span>{it.name} × {it.qty}</span>
+                            <span>{(it.price * it.qty).toLocaleString("ru-RU")} ₸</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <select
+                          value={o.status}
+                          onChange={(e) => handleOrderStatus(o.id, e.target.value)}
+                          className="px-3 py-2 rounded-lg border border-line text-xs"
+                        >
+                          {ORDER_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                        </select>
+                        <a
+                          href={`https://wa.me/${o.phone.replace(/[^0-9]/g, "")}`}
+                          target="_blank"
+                          className="bg-[#25D366] text-white rounded-full px-4 py-2 text-xs font-bold"
+                        >
+                          WhatsApp жазу
+                        </a>
+                        <button onClick={() => handleDeleteOrder(o.id)} className="text-coral font-bold text-xs ml-auto">
+                          Жою
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === "contacts" && (
+        <div className="bg-white border border-line rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-line font-bold">Байланыс хабарламалары</div>
+          {loadingContacts ? (
+            <div className="p-8 text-center text-ink-soft text-sm">Жүктелуде...</div>
+          ) : contacts.length === 0 ? (
+            <div className="p-8 text-center text-ink-soft text-sm">Әлі хабарлама жоқ.</div>
+          ) : (
+            <div className="divide-y divide-line">
+              {contacts.map((c) => (
+                <div key={c.id} className="p-5">
+                  <div className="flex justify-between items-start flex-wrap gap-2 mb-2">
+                    <div>
+                      <div className="font-bold text-sm mb-1">
+                        {c.name}
+                        <StatusPill status={c.status} labels={[{ value: "new", label: "Жаңа" }, { value: "read", label: "Оқылды" }, { value: "replied", label: "Жауап берілді" }]} />
+                      </div>
+                      <div className="text-xs text-ink-soft">
+                        {c.phone} {c.email ? `· ${c.email}` : ""} · {new Date(c.created_at).toLocaleString("ru-RU")}
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-sm text-ink-soft mb-3 bg-bg-gray rounded-xl p-3">{c.message}</p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <select
+                      value={c.status}
+                      onChange={(e) => handleContactStatus(c.id, e.target.value)}
+                      className="px-3 py-2 rounded-lg border border-line text-xs"
+                    >
+                      <option value="new">Жаңа</option>
+                      <option value="read">Оқылды</option>
+                      <option value="replied">Жауап берілді</option>
+                    </select>
+                    <a
+                      href={`https://wa.me/${c.phone.replace(/[^0-9]/g, "")}`}
+                      target="_blank"
+                      className="bg-[#25D366] text-white rounded-full px-4 py-2 text-xs font-bold"
+                    >
+                      WhatsApp жазу
+                    </a>
+                    <button onClick={() => handleDeleteContact(c.id)} className="text-coral font-bold text-xs ml-auto">
+                      Жою
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {modalOpen && (
         <div className="fixed inset-0 bg-black/40 z-[100] flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) setModalOpen(false); }}>
@@ -220,6 +427,45 @@ export default function AdminDashboard() {
         }
       `}</style>
     </section>
+  );
+}
+
+function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`px-4 py-3 text-sm font-bold border-b-2 transition flex items-center gap-1.5 ${
+        active ? "border-deep-green text-deep-green" : "border-transparent text-ink-soft"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function Badge({ count }: { count: number }) {
+  return (
+    <span className="bg-coral text-white text-[10px] font-extrabold w-4 h-4 rounded-full flex items-center justify-center">
+      {count}
+    </span>
+  );
+}
+
+function StatusPill({ status, labels }: { status: string; labels: { value: string; label: string }[] }) {
+  const label = labels.find((l) => l.value === status)?.label || status;
+  const colors: Record<string, string> = {
+    new: "bg-coral/10 text-coral",
+    confirmed: "bg-blue/10 text-blue",
+    shipped: "bg-blue/10 text-blue",
+    delivered: "bg-green/10 text-green",
+    cancelled: "bg-gray-200 text-gray-500",
+    read: "bg-blue/10 text-blue",
+    replied: "bg-green/10 text-green",
+  };
+  return (
+    <span className={`ml-2 text-[10px] font-extrabold px-2 py-0.5 rounded-full ${colors[status] || "bg-gray-200 text-gray-500"}`}>
+      {label}
+    </span>
   );
 }
 
