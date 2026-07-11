@@ -5,6 +5,7 @@ import { getCategory } from "@/lib/data/categories";
 import { useLang } from "@/lib/i18n/LanguageContext";
 import { useCart } from "@/lib/cart/CartContext";
 import { useProducts } from "@/lib/products/ProductsContext";
+import { useSettings } from "@/lib/settings/SettingsContext";
 
 function fmt(n: number) {
   return n.toLocaleString("ru-RU") + " ₸";
@@ -16,6 +17,7 @@ export default function ProductPage() {
   const { lang, t } = useLang();
   const { addToCart } = useCart();
   const { products, loading } = useProducts();
+  const { settings } = useSettings();
 
   const id = Number(params.id);
   const product = products.find((p) => p.id === id);
@@ -76,7 +78,7 @@ export default function ProductPage() {
               {t("add")}
             </button>
             <a
-              href={`https://wa.me/77000000000?text=${encodeURIComponent(product.name[lang] + " — " + fmt(product.price))}`}
+              href={`https://wa.me/${(settings?.whatsapp || "77000000000").replace(/[^0-9]/g, "")}?text=${encodeURIComponent(product.name[lang] + " — " + fmt(product.price))}`}
               target="_blank"
               className="bg-[#25D366] text-white rounded-full px-6 py-3 font-bold text-sm"
             >

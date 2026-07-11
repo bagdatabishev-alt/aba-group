@@ -3,12 +3,19 @@ import "./globals.css";
 import { LanguageProvider } from "@/lib/i18n/LanguageContext";
 import { CartProvider } from "@/lib/cart/CartContext";
 import { ProductsProvider } from "@/lib/products/ProductsContext";
+import { SettingsProvider } from "@/lib/settings/SettingsContext";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://aba-group-gamma.vercel.app"),
   title: "ABA Group — Global Business Solutions",
   description: "ABA Group — халықаралық бизнес платформасы. Электроника, үй тауарлары, автоаксессуарлар, құрылыс материалдары және басқа да өнімдер.",
+  openGraph: {
+    title: "ABA Group — Global Business Solutions",
+    description: "ABA Group — халықаралық бизнес платформасы.",
+    type: "website",
+  },
 };
 
 export default function RootLayout({
@@ -28,13 +35,15 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex flex-col">
         <LanguageProvider>
-          <ProductsProvider>
-            <CartProvider>
-              <Navbar />
-              <main className="flex-1">{children}</main>
-              <Footer />
-            </CartProvider>
-          </ProductsProvider>
+          <SettingsProvider>
+            <ProductsProvider>
+              <CartProvider>
+                <Navbar />
+                <main className="flex-1">{children}</main>
+                <Footer />
+              </CartProvider>
+            </ProductsProvider>
+          </SettingsProvider>
         </LanguageProvider>
       </body>
     </html>

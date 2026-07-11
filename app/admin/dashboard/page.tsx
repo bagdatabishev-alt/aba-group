@@ -18,6 +18,7 @@ import {
   deleteContactRequest,
   DbContactRequest,
 } from "@/lib/supabase/contact";
+import { fetchSettings, updateSettings, SiteSettings } from "@/lib/supabase/settings";
 import { CATEGORIES } from "@/lib/data/categories";
 
 const EMPTY_FORM: ProductInput = {
@@ -44,7 +45,7 @@ const ORDER_STATUSES = [
   { value: "cancelled", label: "Болдырылмады" },
 ];
 
-type Tab = "products" | "orders" | "contacts";
+type Tab = "products" | "orders" | "contacts" | "settings";
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -68,6 +69,12 @@ export default function AdminDashboard() {
   const [contacts, setContacts] = useState<DbContactRequest[]>([]);
   const [loadingContacts, setLoadingContacts] = useState(true);
 
+  // Site settings state
+  const [siteSettings, setSiteSettings] = useState<SiteSettings | null>(null);
+  const [loadingSettings, setLoadingSettings] = useState(true);
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [settingsSaved, setSettingsSaved] = useState(false);
+
   useEffect(() => {
     (async () => {
       const session = await getSession();
@@ -79,6 +86,7 @@ export default function AdminDashboard() {
       loadProducts();
       loadOrders();
       loadContacts();
+      loadSettings();
     })();
   }, [router]);
 
@@ -98,6 +106,29 @@ export default function AdminDashboard() {
     setLoadingContacts(true);
     setContacts(await fetchContactRequests());
     setLoadingContacts(false);
+  }
+
+  async function loadSettings() {
+    setLoadingSettings(true);
+    setSiteSettings(await fetchSettings());
+    setLoadingSettings(false);
+  }
+
+  async function handleSaveSettings(e: React.FormEvent) {
+    e.preventDefault();
+    if (!siteSettings) return;
+    setSavingSettings(true);
+    await updateSettings({
+      phone: siteSettings.phone,
+      whatsapp: siteSettings.whatsapp,
+      telegram: siteSettings.telegram,
+      email: siteSettings.email,
+      address: siteSettings.address,
+      hours: siteSettings.hours,
+    });
+    setSavingSettings(false);
+    setSettingsSaved(true);
+    setTimeout(() => setSettingsSaved(false), 2500);
   }
 
   function openAdd() {
@@ -204,6 +235,9 @@ export default function AdminDashboard() {
         </TabButton>
         <TabButton active={tab === "contacts"} onClick={() => setTab("contacts")}>
           Хабарламалар {newContactsCount > 0 && <Badge count={newContactsCount} />}
+        </TabButton>
+        <TabButton active={tab === "settings"} onClick={() => setTab("settings")}>
+          Баптаулар
         </TabButton>
       </div>
 
@@ -376,6 +410,69 @@ export default function AdminDashboard() {
                 </div>
               ))}
             </div>
+          )}
+        </div>
+      )}
+
+      {tab === "settings" && (
+        <div className="bg-white border border-line rounded-2xl p-6 max-w-xl">
+          <div className="font-bold mb-1">Байланыс ақпараты</div>
+          <p className="text-xs text-ink-soft mb-5">
+            Мұнда өзгертілген ақпарат сайттың Байланыс бетінде және footer-де дереу көрінеді.
+          </p>
+          {loadingSettings || !siteSettings ? (
+            <div className="text-center py-8 text-ink-soft text-sm">Жүктелуде...</div>
+          ) : (
+            <form onSubmit={handleSaveSettings} className="grid gap-3.5">
+              <Field label="Телефон">
+                <input
+                  value={siteSettings.phone}
+                  onChange={(e) => setSiteSettings({ ...siteSettings, phone: e.target.value })}
+                  className="input"
+                />
+              </Field>
+              <Field label="WhatsApp (нөмір, мыс. +77001234567)">
+                <input
+                  value={siteSettings.whatsapp}
+                  onChange={(e) => setSiteSettings({ ...siteSettings, whatsapp: e.target.value })}
+                  className="input"
+                />
+              </Field>
+              <Field label="Telegram (мыс. @abagroup)">
+                <input
+                  value={siteSettings.telegram}
+                  onChange={(e) => setSiteSettings({ ...siteSettings, telegram: e.target.value })}
+                  className="input"
+                />
+              </Field>
+              <Field label="Email">
+                <input
+                  value={siteSettings.email}
+                  onChange={(e) => setSiteSettings({ ...siteSettings, email: e.target.value })}
+                  className="input"
+                />
+              </Field>
+              <Field label="Мекенжай">
+                <input
+                  value={siteSettings.address}
+                  onChange={(e) => setSiteSettings({ ...siteSettings, address: e.target.value })}
+                  className="input"
+                />
+              </Field>
+              <Field label="Жұмыс уақыты">
+                <input
+                  value={siteSettings.hours}
+                  onChange={(e) => setSiteSettings({ ...siteSettings, hours: e.target.value })}
+                  className="input"
+                />
+              </Field>
+              <div className="flex items-center gap-3 mt-2">
+                <button disabled={savingSettings} type="submit" className="bg-deep-green text-white rounded-full px-6 py-3 font-bold text-sm disabled:opacity-50">
+                  {savingSettings ? "Сақталуда..." : "Сақтау"}
+                </button>
+                {settingsSaved && <span className="text-green text-sm font-bold">✓ Сақталды</span>}
+              </div>
+            </form>
           )}
         </div>
       )}

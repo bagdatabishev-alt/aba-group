@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import { useLang } from "@/lib/i18n/LanguageContext";
+import { useSettings } from "@/lib/settings/SettingsContext";
 
 export default function ContactPage() {
   const { t } = useLang();
+  const { settings } = useSettings();
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({ name: "", phone: "", email: "", message: "" });
@@ -29,12 +31,12 @@ export default function ContactPage() {
   }
 
   const infoRows = [
-    ["📞", "Телефон", "+7 700 000 00 00"],
-    ["💬", "WhatsApp", "+7 700 000 00 00"],
-    ["✈️", "Telegram", "@abagroup"],
-    ["✉️", "Email", "info@abagroup.kz"],
-    ["📍", "Address", "Astana, Kazakhstan"],
-    ["🕐", "Hours", "Дс–Жм: 09:00–18:00"],
+    ["📞", "Телефон", settings?.phone || "—"],
+    ["💬", "WhatsApp", settings?.whatsapp || "—"],
+    ["✈️", "Telegram", settings?.telegram || "—"],
+    ["✉️", "Email", settings?.email || "—"],
+    ["📍", "Мекенжай", settings?.address || "—"],
+    ["🕐", "Жұмыс уақыты", settings?.hours || "—"],
   ];
 
   return (
@@ -47,7 +49,7 @@ export default function ContactPage() {
       <div className="grid md:grid-cols-2 gap-8">
         <div className="flex flex-col gap-3.5">
           {infoRows.map(([icon, label, value], i) => (
-            <div key={i} className="flex gap-3.5 items-start bg-white border border-line rounded-2xl px-4 py-4">
+            <div key={i} className="flex gap-3.5 items-start bg-white border border-line rounded-2xl px-4.5 py-4">
               <div className="text-xl">{icon}</div>
               <div>
                 <b className="block text-sm mb-0.5">{label}</b>
@@ -105,7 +107,7 @@ export default function ContactPage() {
             </form>
           ) : (
             <div className="text-center py-10">
-              <div className="w-16 h-16 rounded-full bg-green/10 text-green text-3xl flex items-center justify-center mx-auto mb-4">✓</div>
+              <div className="w-16 h-16 rounded-full bg-green/10 text-green text-3xl flex items-center justify-center mx-auto mb-4.5">✓</div>
               <h3 className="font-extrabold text-lg">{t("cs_title")}</h3>
               <p className="text-sm text-ink-soft mt-2">{t("cs_text")}</p>
             </div>
