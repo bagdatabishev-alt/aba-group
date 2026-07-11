@@ -30,14 +30,18 @@ export default function ContactPage() {
     }
   }
 
+  const phoneDigits = (settings?.phone || "").replace(/[^0-9+]/g, "");
+  const waDigits = (settings?.whatsapp || "").replace(/[^0-9]/g, "");
+  const tgHandle = (settings?.telegram || "").replace("@", "").replace(/^https?:\/\/t\.me\//, "");
+
   const infoRows = [
-    ["📞", "Телефон", settings?.phone || "—"],
-    ["💬", "WhatsApp", settings?.whatsapp || "—"],
-    ["✈️", "Telegram", settings?.telegram || "—"],
-    ["✉️", "Email", settings?.email || "—"],
-    ["📍", "Мекенжай", settings?.address || "—"],
-    ["🕐", "Жұмыс уақыты", settings?.hours || "—"],
-  ];
+    ["📞", "Телефон", settings?.phone || "—", phoneDigits ? `tel:${phoneDigits}` : null],
+    ["💬", "WhatsApp", settings?.whatsapp || "—", waDigits ? `https://wa.me/${waDigits}` : null],
+    ["✈️", "Telegram", settings?.telegram || "—", tgHandle ? `https://t.me/${tgHandle}` : null],
+    ["✉️", "Email", settings?.email || "—", settings?.email ? `mailto:${settings.email}` : null],
+    ["📍", "Мекенжай", settings?.address || "—", null],
+    ["🕐", "Жұмыс уақыты", settings?.hours || "—", null],
+  ] as const;
 
   return (
     <section className="py-20 px-5 max-w-6xl mx-auto">
@@ -48,15 +52,31 @@ export default function ContactPage() {
 
       <div className="grid md:grid-cols-2 gap-8">
         <div className="flex flex-col gap-3.5">
-          {infoRows.map(([icon, label, value], i) => (
-            <div key={i} className="flex gap-3.5 items-start bg-white border border-line rounded-2xl px-4.5 py-4">
-              <div className="text-xl">{icon}</div>
-              <div>
-                <b className="block text-sm mb-0.5">{label}</b>
-                <span className="text-sm text-ink-soft">{value}</span>
+          {infoRows.map(([icon, label, value, href], i) => {
+            const content = (
+              <>
+                <div className="text-xl">{icon}</div>
+                <div>
+                  <b className="block text-sm mb-0.5">{label}</b>
+                  <span className="text-sm text-ink-soft">{value}</span>
+                </div>
+              </>
+            );
+            return href ? (
+              <a
+                key={i}
+                href={href}
+                target={href.startsWith("tel:") || href.startsWith("mailto:") ? undefined : "_blank"}
+                className="flex gap-3.5 items-start bg-white border border-line rounded-2xl px-4.5 py-4 hover:border-deep-green hover:shadow-sm transition"
+              >
+                {content}
+              </a>
+            ) : (
+              <div key={i} className="flex gap-3.5 items-start bg-white border border-line rounded-2xl px-4.5 py-4">
+                {content}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         <div className="bg-white border border-line rounded-[20px] p-7 shadow-sm">
