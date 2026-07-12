@@ -13,6 +13,7 @@ export interface DbOrder {
   items: { id: number; name: string; price: number; qty: number }[];
   total: number;
   status: string;
+  payment_status: string;
   created_at: string;
 }
 
@@ -29,6 +30,11 @@ export async function fetchOrders(): Promise<DbOrder[]> {
 export async function updateOrderStatus(id: number, status: string) {
   const supabase = createClient();
   return supabase.from("orders").update({ status }).eq("id", id);
+}
+
+export async function updatePaymentStatus(id: number, payment_status: string) {
+  const supabase = createClient();
+  return supabase.from("orders").update({ payment_status }).eq("id", id);
 }
 
 export async function deleteOrder(id: number) {

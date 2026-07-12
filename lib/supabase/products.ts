@@ -26,6 +26,7 @@ export interface UiProduct {
   id: number;
   cat: string;
   icon: string;
+  image: string | null;
   price: number;
   old: number | null;
   brand: string;
@@ -40,6 +41,7 @@ function toUiProduct(p: DbProduct): UiProduct {
     id: p.id,
     cat: p.category_id,
     icon: p.icon || "📦",
+    image: p.image_url || null,
     price: Number(p.price),
     old: p.old_price ? Number(p.old_price) : null,
     brand: p.brand || "",
@@ -78,6 +80,7 @@ export interface ProductInput {
   old_price: number | null;
   stock: number;
   icon: string;
+  image_url: string | null;
   name_kz: string;
   name_ru: string;
   name_en: string;
@@ -106,4 +109,19 @@ export async function fetchAllProductsForAdmin(): Promise<DbProduct[]> {
   const { data, error } = await supabase.from("products").select("*").order("id", { ascending: true });
   if (error || !data) return [];
   return data as DbProduct[];
+}
+
+// ===== Image upload to Supabase Storage =====
+
+export async function uploadProductImage(file: File): Promise<string | null> {
+  const supabase = createBrowserClient();
+  const ext = file.name.split(".").pop();
+  const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const { error } = await supabase.storage.from("product-images").upload(fileName, file, {
+    cacheControl: "3600",
+    upsert: false,
+  });
+  if (error) return null;
+  const { data } = supabase.storage.from("product-images").getPublicUrl(fileName);
+  return data.publicUrl;
 }

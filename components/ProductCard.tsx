@@ -21,8 +21,12 @@ export default function ProductCard({ product }: { product: UiProduct }) {
       href={`/product/${product.id}`}
       className="bg-white border border-line rounded-[18px] overflow-hidden shadow-sm hover:shadow-lg hover:-translate-y-1 transition flex flex-col"
     >
-      <div className="h-36 bg-bg-gray flex items-center justify-center text-5xl relative">
-        {product.icon}
+      <div className="h-36 bg-bg-gray flex items-center justify-center text-5xl relative overflow-hidden">
+        {product.image ? (
+          <img src={product.image} alt={product.name[lang]} className="w-full h-full object-cover" />
+        ) : (
+          product.icon
+        )}
         {discount && (
           <span className="absolute top-2.5 left-2.5 bg-coral text-white text-[11px] font-extrabold px-2.5 py-1 rounded-full">
             -{discount}%

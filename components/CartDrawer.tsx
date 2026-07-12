@@ -45,8 +45,12 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
               const qty = cart[id];
               return (
                 <div key={id} className="flex gap-3 py-3.5 border-b border-line">
-                  <div className="w-14 h-14 rounded-xl bg-bg-gray flex items-center justify-center text-2xl flex-shrink-0">
-                    {p.icon}
+                  <div className="w-14 h-14 rounded-xl bg-bg-gray flex items-center justify-center text-2xl flex-shrink-0 overflow-hidden">
+                    {p.image ? (
+                      <img src={p.image} alt={p.name[lang]} className="w-full h-full object-cover" />
+                    ) : (
+                      p.icon
+                    )}
                   </div>
                   <div className="flex-1">
                     <div className="text-sm font-bold mb-1">{p.name[lang]}</div>

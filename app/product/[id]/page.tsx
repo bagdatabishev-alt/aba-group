@@ -43,8 +43,12 @@ export default function ProductPage() {
         ← {t("continue")}
       </button>
       <div className="grid md:grid-cols-2 border border-line rounded-[22px] overflow-hidden shadow-sm">
-        <div className="bg-bg-gray flex items-center justify-center text-[120px] min-h-[280px]">
-          {product.icon}
+        <div className="bg-bg-gray flex items-center justify-center text-[120px] min-h-[280px] overflow-hidden">
+          {product.image ? (
+            <img src={product.image} alt={product.name[lang]} className="w-full h-full object-cover" />
+          ) : (
+            product.icon
+          )}
         </div>
         <div className="p-8">
           <div className="text-xs font-bold text-blue uppercase mb-2">{category?.name[lang]}</div>

@@ -8,10 +8,11 @@ import {
   createProduct,
   updateProduct,
   deleteProduct,
+  uploadProductImage,
   DbProduct,
   ProductInput,
 } from "@/lib/supabase/products";
-import { fetchOrders, updateOrderStatus, deleteOrder, DbOrder } from "@/lib/supabase/orders";
+import { fetchOrders, updateOrderStatus, updatePaymentStatus, deleteOrder, DbOrder } from "@/lib/supabase/orders";
 import {
   fetchContactRequests,
   updateContactStatus,
@@ -29,6 +30,7 @@ const EMPTY_FORM: ProductInput = {
   old_price: null,
   stock: 0,
   icon: "📦",
+  image_url: null,
   name_kz: "",
   name_ru: "",
   name_en: "",
@@ -45,6 +47,12 @@ const ORDER_STATUSES = [
   { value: "cancelled", label: "Болдырылмады" },
 ];
 
+const PAYMENT_STATUSES = [
+  { value: "unpaid", label: "Төленбеген" },
+  { value: "paid", label: "Төленген" },
+  { value: "refunded", label: "Қайтарылған" },
+];
+
 type Tab = "products" | "orders" | "contacts" | "settings";
 
 export default function AdminDashboard() {
@@ -59,6 +67,7 @@ export default function AdminDashboard() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<ProductInput>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   // Orders state
   const [orders, setOrders] = useState<DbOrder[]>([]);
@@ -147,6 +156,7 @@ export default function AdminDashboard() {
       old_price: p.old_price ? Number(p.old_price) : null,
       stock: p.stock,
       icon: p.icon || "📦",
+      image_url: p.image_url || null,
       name_kz: p.name_kz,
       name_ru: p.name_ru,
       name_en: p.name_en,
@@ -155,6 +165,16 @@ export default function AdminDashboard() {
       desc_en: p.desc_en || "",
     });
     setModalOpen(true);
+  }
+
+  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingImage(true);
+    const url = await uploadProductImage(file);
+    setUploadingImage(false);
+    if (url) setForm((prev) => ({ ...prev, image_url: url }));
+    else alert("Суретті жүктеу сәтсіз аяқталды. Қайталап көріңіз.");
   }
 
   async function handleSave(e: React.FormEvent) {
@@ -179,6 +199,38 @@ export default function AdminDashboard() {
   async function handleOrderStatus(id: number, status: string) {
     await updateOrderStatus(id, status);
     loadOrders();
+  }
+
+  async function handlePaymentStatus(id: number, payment_status: string) {
+    await updatePaymentStatus(id, payment_status);
+    loadOrders();
+  }
+
+  function exportOrdersToExcel() {
+    const headers = ["Тапсырыс №", "Клиент", "Телефон", "Email", "Қала", "Мекенжай", "Тауарлар", "Сома", "Статус", "Төлем", "Күні"];
+    const rows = orders.map((o) => [
+      o.order_number,
+      o.customer_name,
+      o.phone,
+      o.email || "",
+      o.city,
+      o.address,
+      (o.items || []).map((it) => `${it.name} x${it.qty}`).join("; "),
+      o.total,
+      ORDER_STATUSES.find((s) => s.value === o.status)?.label || o.status,
+      PAYMENT_STATUSES.find((s) => s.value === o.payment_status)?.label || o.payment_status,
+      new Date(o.created_at).toLocaleString("ru-RU"),
+    ]);
+    const csv = [headers, ...rows]
+      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `aba-group-tapsyrystar-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
   }
 
   async function handleDeleteOrder(id: number) {
@@ -293,7 +345,14 @@ export default function AdminDashboard() {
 
       {tab === "orders" && (
         <div className="bg-white border border-line rounded-2xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-line font-bold">Тапсырыстар тізімі</div>
+          <div className="px-5 py-4 border-b border-line font-bold flex justify-between items-center">
+            <span>Тапсырыстар тізімі</span>
+            {orders.length > 0 && (
+              <button onClick={exportOrdersToExcel} className="bg-bg-gray hover:bg-deep-green hover:text-white text-deep-green rounded-full px-4 py-2 text-xs font-bold transition">
+                📊 Excel-ге экспорттау
+              </button>
+            )}
+          </div>
           {loadingOrders ? (
             <div className="p-8 text-center text-ink-soft text-sm">Жүктелуде...</div>
           ) : orders.length === 0 ? (
@@ -310,6 +369,7 @@ export default function AdminDashboard() {
                       <div className="font-bold text-sm mb-1">
                         #{o.order_number} — {o.customer_name}
                         <StatusPill status={o.status} labels={ORDER_STATUSES} />
+                        <StatusPill status={o.payment_status} labels={PAYMENT_STATUSES} />
                       </div>
                       <div className="text-xs text-ink-soft">
                         {o.phone} · {o.city} · {new Date(o.created_at).toLocaleString("ru-RU")}
@@ -342,6 +402,13 @@ export default function AdminDashboard() {
                           className="px-3 py-2 rounded-lg border border-line text-xs"
                         >
                           {ORDER_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                        </select>
+                        <select
+                          value={o.payment_status}
+                          onChange={(e) => handlePaymentStatus(o.id, e.target.value)}
+                          className="px-3 py-2 rounded-lg border border-line text-xs"
+                        >
+                          {PAYMENT_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
                         </select>
                         <a
                           href={`https://wa.me/${o.phone.replace(/[^0-9]/g, "")}`}
@@ -496,8 +563,24 @@ export default function AdminDashboard() {
                 <Field label="Қор саны"><input required type="number" value={form.stock} onChange={(e) => setForm({ ...form, stock: Number(e.target.value) })} className="input" /></Field>
                 <Field label="Бренд"><input value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} className="input" /></Field>
                 <Field label="SKU"><input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} className="input" /></Field>
-                <Field label="Иконка (emoji)"><input value={form.icon} onChange={(e) => setForm({ ...form, icon: e.target.value })} className="input" /></Field>
+                <Field label="Иконка (emoji, сурет жоқ болса көрінеді)"><input value={form.icon} onChange={(e) => setForm({ ...form, icon: e.target.value })} className="input" /></Field>
               </div>
+              <Field label="Тауар суреті">
+                <div className="flex items-center gap-3">
+                  {form.image_url && (
+                    <img src={form.image_url} alt="" className="w-16 h-16 rounded-lg object-cover border border-line" />
+                  )}
+                  <label className="bg-bg-gray hover:bg-deep-green hover:text-white text-deep-green rounded-lg px-4 py-2.5 text-sm font-bold cursor-pointer transition">
+                    {uploadingImage ? "Жүктелуде..." : form.image_url ? "Суретті ауыстыру" : "Сурет жүктеу"}
+                    <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" disabled={uploadingImage} />
+                  </label>
+                  {form.image_url && (
+                    <button type="button" onClick={() => setForm({ ...form, image_url: null })} className="text-coral text-xs font-bold">
+                      Жою
+                    </button>
+                  )}
+                </div>
+              </Field>
               <Field label="Сипаттама (KZ)"><textarea value={form.desc_kz} onChange={(e) => setForm({ ...form, desc_kz: e.target.value })} className="input" rows={2} /></Field>
               <Field label="Сипаттама (RU)"><textarea value={form.desc_ru} onChange={(e) => setForm({ ...form, desc_ru: e.target.value })} className="input" rows={2} /></Field>
               <Field label="Сипаттама (EN)"><textarea value={form.desc_en} onChange={(e) => setForm({ ...form, desc_en: e.target.value })} className="input" rows={2} /></Field>
@@ -558,6 +641,9 @@ function StatusPill({ status, labels }: { status: string; labels: { value: strin
     cancelled: "bg-gray-200 text-gray-500",
     read: "bg-blue/10 text-blue",
     replied: "bg-green/10 text-green",
+    unpaid: "bg-coral/10 text-coral",
+    paid: "bg-green/10 text-green",
+    refunded: "bg-gray-200 text-gray-500",
   };
   return (
     <span className={`ml-2 text-[10px] font-extrabold px-2 py-0.5 rounded-full ${colors[status] || "bg-gray-200 text-gray-500"}`}>
