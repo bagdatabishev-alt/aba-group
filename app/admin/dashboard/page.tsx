@@ -20,6 +20,7 @@ import {
   DbContactRequest,
 } from "@/lib/supabase/contact";
 import { fetchSettings, updateSettings, SiteSettings } from "@/lib/supabase/settings";
+import { printInvoice } from "@/lib/invoice/generateInvoice";
 import { CATEGORIES } from "@/lib/data/categories";
 
 const EMPTY_FORM: ProductInput = {
@@ -134,6 +135,10 @@ export default function AdminDashboard() {
       email: siteSettings.email,
       address: siteSettings.address,
       hours: siteSettings.hours,
+      delivery_fee_local: siteSettings.delivery_fee_local,
+      delivery_fee_other: siteSettings.delivery_fee_other,
+      delivery_free_threshold: siteSettings.delivery_free_threshold,
+      local_city: siteSettings.local_city,
     });
     setSavingSettings(false);
     setSettingsSaved(true);
@@ -417,6 +422,25 @@ export default function AdminDashboard() {
                         >
                           WhatsApp жазу
                         </a>
+                        <button
+                          onClick={() =>
+                            printInvoice({
+                              orderNumber: o.order_number,
+                              customerName: o.customer_name,
+                              phone: o.phone,
+                              email: o.email,
+                              city: o.city,
+                              address: o.address,
+                              items: o.items,
+                              total: Number(o.total),
+                              deliveryFee: Number(o.delivery_fee || 0),
+                              createdAt: o.created_at,
+                            })
+                          }
+                          className="border border-deep-green text-deep-green rounded-full px-4 py-2 text-xs font-bold"
+                        >
+                          📄 Есеп-шот
+                        </button>
                         <button onClick={() => handleDeleteOrder(o.id)} className="text-coral font-bold text-xs ml-auto">
                           Жою
                         </button>
@@ -533,6 +557,45 @@ export default function AdminDashboard() {
                   className="input"
                 />
               </Field>
+
+              <div className="font-bold mt-3 mb-1">Жеткізу тарифі</div>
+              <p className="text-xs text-ink-soft mb-2">
+                Тапсырыс кезінде клиенттің қаласы осы қалаға сай келсе — жергілікті тариф, өзгесінде — басқа қала тарифі қолданылады.
+              </p>
+              <Field label="Жергілікті қала атауы">
+                <input
+                  value={siteSettings.local_city}
+                  onChange={(e) => setSiteSettings({ ...siteSettings, local_city: e.target.value })}
+                  className="input"
+                />
+              </Field>
+              <div className="grid grid-cols-2 gap-3.5">
+                <Field label="Жергілікті жеткізу ақысы (₸)">
+                  <input
+                    type="number"
+                    value={siteSettings.delivery_fee_local}
+                    onChange={(e) => setSiteSettings({ ...siteSettings, delivery_fee_local: Number(e.target.value) })}
+                    className="input"
+                  />
+                </Field>
+                <Field label="Басқа қала жеткізу ақысы (₸)">
+                  <input
+                    type="number"
+                    value={siteSettings.delivery_fee_other}
+                    onChange={(e) => setSiteSettings({ ...siteSettings, delivery_fee_other: Number(e.target.value) })}
+                    className="input"
+                  />
+                </Field>
+              </div>
+              <Field label="Тегін жеткізу шегі (₸, 0 = өшірулі)">
+                <input
+                  type="number"
+                  value={siteSettings.delivery_free_threshold}
+                  onChange={(e) => setSiteSettings({ ...siteSettings, delivery_free_threshold: Number(e.target.value) })}
+                  className="input"
+                />
+              </Field>
+
               <div className="flex items-center gap-3 mt-2">
                 <button disabled={savingSettings} type="submit" className="bg-deep-green text-white rounded-full px-6 py-3 font-bold text-sm disabled:opacity-50">
                   {savingSettings ? "Сақталуда..." : "Сақтау"}

@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import { useLang } from "@/lib/i18n/LanguageContext";
 import { useCart } from "@/lib/cart/CartContext";
 import { useProducts } from "@/lib/products/ProductsContext";
+import { useSettings } from "@/lib/settings/SettingsContext";
+import { calculateDeliveryFee } from "@/lib/supabase/settings";
+import { printInvoice } from "@/lib/invoice/generateInvoice";
 
 function fmt(n: number) {
   return n.toLocaleString("ru-RU") + " ₸";
@@ -14,17 +17,28 @@ export default function CheckoutPage() {
   const { lang, t } = useLang();
   const { cart, clearCart } = useCart();
   const { products } = useProducts();
+  const { settings } = useSettings();
   const router = useRouter();
 
   const [loading, setLoading] = useState(false);
   const [orderNumber, setOrderNumber] = useState<number | null>(null);
+  const [lastOrderData, setLastOrderData] = useState<{
+    items: { id: number; name: string; price: number; qty: number }[];
+    total: number;
+    deliveryFee: number;
+    city: string;
+    address: string;
+    createdAt: string;
+  } | null>(null);
   const [form, setForm] = useState({ name: "", phone: "", email: "", country: "Қазақстан", city: "", address: "", notes: "" });
 
   const ids = Object.keys(cart).map(Number);
-  const cartTotal = ids.reduce((sum, id) => {
+  const subtotal = ids.reduce((sum, id) => {
     const p = products.find((x) => x.id === id);
     return sum + (p ? p.price * cart[id] : 0);
   }, 0);
+  const deliveryFee = settings ? calculateDeliveryFee(settings, form.city, subtotal) : 0;
+  const cartTotal = subtotal + deliveryFee;
 
   if (ids.length === 0 && orderNumber === null) {
     return (
@@ -45,14 +59,17 @@ export default function CheckoutPage() {
       const p = products.find((x) => x.id === id)!;
       return { id, name: p.name[lang], price: p.price, qty: cart[id] };
     });
+    const createdAt = new Date().toISOString();
     try {
       const res = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, items, total: cartTotal }),
+        body: JSON.stringify({ ...form, items, total: cartTotal, deliveryFee }),
       });
       const data = await res.json();
-      setOrderNumber(data.orderNumber ?? 1000);
+      const num = data.orderNumber ?? 1000;
+      setOrderNumber(num);
+      setLastOrderData({ items, total: cartTotal, deliveryFee, city: form.city, address: form.address, createdAt });
     } catch {
       setOrderNumber(1000);
     } finally {
@@ -61,15 +78,36 @@ export default function CheckoutPage() {
     }
   }
 
+  function handlePrintInvoice() {
+    if (!orderNumber || !lastOrderData) return;
+    printInvoice({
+      orderNumber,
+      customerName: form.name,
+      phone: form.phone,
+      email: form.email,
+      city: lastOrderData.city,
+      address: lastOrderData.address,
+      items: lastOrderData.items,
+      total: lastOrderData.total,
+      deliveryFee: lastOrderData.deliveryFee,
+      createdAt: lastOrderData.createdAt,
+    });
+  }
+
   if (orderNumber !== null) {
     return (
       <div className="text-center py-24 px-5">
         <div className="w-16 h-16 rounded-full bg-green/10 text-green text-3xl flex items-center justify-center mx-auto mb-4.5">✓</div>
         <h3 className="font-extrabold text-xl mb-2">{t("os_title")}</h3>
         <p className="text-ink-soft mb-6">{t("os_text").replace("{id}", String(orderNumber))}</p>
-        <button onClick={() => router.push("/")} className="bg-deep-green text-white rounded-full px-6 py-3 font-bold">
-          {t("nav_home")}
-        </button>
+        <div className="flex gap-3 justify-center flex-wrap">
+          <button onClick={handlePrintInvoice} className="border border-deep-green text-deep-green rounded-full px-6 py-3 font-bold">
+            📄 Есеп-шот (PDF)
+          </button>
+          <button onClick={() => router.push("/")} className="bg-deep-green text-white rounded-full px-6 py-3 font-bold">
+            {t("nav_home")}
+          </button>
+        </div>
       </div>
     );
   }
@@ -89,6 +127,10 @@ export default function CheckoutPage() {
             </div>
           );
         })}
+        <div className="flex justify-between text-sm py-1.5 text-ink-soft">
+          <span>Жеткізу{form.city ? "" : " (қаланы толтырыңыз)"}</span>
+          <span>{fmt(deliveryFee)}</span>
+        </div>
         <div className="flex justify-between font-extrabold text-base mt-2.5 pt-2.5 border-t border-line">
           <span>{t("total")}</span>
           <span>{fmt(cartTotal)}</span>

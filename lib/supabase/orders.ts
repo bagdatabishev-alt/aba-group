@@ -12,6 +12,7 @@ export interface DbOrder {
   notes: string | null;
   items: { id: number; name: string; price: number; qty: number }[];
   total: number;
+  delivery_fee: number;
   status: string;
   payment_status: string;
   created_at: string;
