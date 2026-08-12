@@ -18,24 +18,24 @@ interface TrackedOrder {
   created_at: string;
 }
 
-const STEPS = [
-  { value: "new", label: "Қабылданды", icon: "📝" },
-  { value: "confirmed", label: "Расталды", icon: "✅" },
-  { value: "shipped", label: "Жолда", icon: "🚚" },
-  { value: "delivered", label: "Жеткізілді", icon: "📦" },
-];
-
 function fmt(n: number) {
   return n.toLocaleString("ru-RU") + " ₸";
 }
 
 export default function TrackOrderPage() {
-  const { lang } = useLang();
+  const { t } = useLang();
   const [orderNumber, setOrderNumber] = useState("");
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const [order, setOrder] = useState<TrackedOrder | null>(null);
   const [notFound, setNotFound] = useState(false);
+
+  const STEPS = [
+    { value: "new", label: t("step_new"), icon: "📝" },
+    { value: "confirmed", label: t("step_confirmed"), icon: "✅" },
+    { value: "shipped", label: t("step_shipped"), icon: "🚚" },
+    { value: "delivered", label: t("step_delivered"), icon: "📦" },
+  ];
 
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -64,25 +64,25 @@ export default function TrackOrderPage() {
   return (
     <section className="py-16 px-5 max-w-2xl mx-auto">
       <div className="text-center mb-9">
-        <div className="text-xs font-extrabold uppercase tracking-wide text-blue mb-3">Тапсырысты бақылау</div>
-        <h2 className="font-display text-3xl font-extrabold text-deep-green tracking-tight">Тапсырысыңыздың мәртебесі</h2>
-        <p className="text-ink-soft mt-2 text-sm">Тапсырыс нөмірі мен телефон нөміріңізді енгізіңіз</p>
+        <div className="text-xs font-extrabold uppercase tracking-wide text-blue mb-3">{t("track_eyebrow")}</div>
+        <h2 className="font-display text-3xl font-extrabold text-deep-green tracking-tight">{t("track_title")}</h2>
+        <p className="text-ink-soft mt-2 text-sm">{t("track_hint")}</p>
       </div>
 
       <form onSubmit={handleSearch} className="bg-white border border-line rounded-2xl p-6 shadow-sm grid gap-3.5 mb-8">
         <div className="grid grid-cols-2 gap-3.5">
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold text-ink-soft">Тапсырыс нөмірі</label>
+            <label className="text-xs font-bold text-ink-soft">{t("track_order_num")}</label>
             <input
               required
               value={orderNumber}
               onChange={(e) => setOrderNumber(e.target.value)}
-              placeholder="мыс. 5437"
+              placeholder="5437"
               className="px-3.5 py-3 rounded-xl border border-line text-sm"
             />
           </div>
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold text-ink-soft">Телефон</label>
+            <label className="text-xs font-bold text-ink-soft">{t("track_phone")}</label>
             <input
               required
               value={phone}
@@ -93,14 +93,14 @@ export default function TrackOrderPage() {
           </div>
         </div>
         <button disabled={loading} type="submit" className="bg-deep-green text-white rounded-full py-3 font-bold disabled:opacity-50">
-          {loading ? "Іздеуде..." : "Тексеру"}
+          {loading ? t("track_checking") : t("track_check")}
         </button>
       </form>
 
       {notFound && (
         <div className="text-center py-8 text-ink-soft bg-bg-gray rounded-2xl">
           <div className="text-3xl mb-2">🔍</div>
-          <p>Тапсырыс табылмады. Нөмір мен телефонды тексеріп қайталаңыз.</p>
+          <p>{t("track_not_found")}</p>
         </div>
       )}
 
@@ -108,14 +108,14 @@ export default function TrackOrderPage() {
         <div className="bg-white border border-line rounded-2xl p-6 shadow-sm">
           <div className="flex justify-between items-start mb-6">
             <div>
-              <div className="font-extrabold text-lg">Тапсырыс #{order.order_number}</div>
+              <div className="font-extrabold text-lg">#{order.order_number}</div>
               <div className="text-xs text-ink-soft">{new Date(order.created_at).toLocaleString("ru-RU")}</div>
             </div>
             <div className="font-extrabold text-deep-green text-lg">{fmt(Number(order.total))}</div>
           </div>
 
           {order.status === "cancelled" ? (
-            <div className="bg-coral/10 text-coral rounded-xl p-4 text-center font-bold mb-6">Тапсырыс болдырылмады</div>
+            <div className="bg-coral/10 text-coral rounded-xl p-4 text-center font-bold mb-6">{t("track_cancelled")}</div>
           ) : (
             <div className="flex justify-between items-center mb-8 relative">
               <div className="absolute top-4 left-0 right-0 h-0.5 bg-line" />
@@ -146,13 +146,13 @@ export default function TrackOrderPage() {
               </div>
             ))}
             <div className="flex justify-between text-sm py-1 text-ink-soft">
-              <span>Жеткізу</span>
+              <span>{t("delivery_label")}</span>
               <span>{fmt(Number(order.delivery_fee || 0))}</span>
             </div>
           </div>
 
           <div className="text-sm text-ink-soft mb-4">
-            <b className="text-ink block mb-0.5">Жеткізу мекенжайы</b>
+            <b className="text-ink block mb-0.5">{t("track_address_label")}</b>
             {order.city}, {order.address}
           </div>
 
@@ -172,7 +172,7 @@ export default function TrackOrderPage() {
             }
             className="w-full border border-deep-green text-deep-green rounded-full py-3 font-bold text-sm"
           >
-            📄 Есеп-шот (PDF)
+            {t("invoice_btn")}
           </button>
         </div>
       )}
