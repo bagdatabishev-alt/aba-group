@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSession, signOut } from "@/lib/supabase/auth";
+import { createClient } from "@/lib/supabase/client";
 import {
   fetchAllProductsForAdmin,
   createProduct,
@@ -54,14 +55,23 @@ const PAYMENT_STATUSES = [
   { value: "refunded", label: "Қайтарылған" },
 ];
 
-type Tab = "products" | "orders" | "contacts" | "settings";
+interface DbCustomer {
+  id: number;
+  user_id: string;
+  name: string | null;
+  phone: string | null;
+  email: string | null;
+  avatar_url: string | null;
+  created_at: string;
+}
+
+type Tab = "products" | "orders" | "contacts" | "customers" | "settings";
 
 export default function AdminDashboard() {
   const router = useRouter();
   const [ready, setReady] = useState(false);
   const [tab, setTab] = useState<Tab>("products");
 
-  // Products state
   const [products, setProducts] = useState<DbProduct[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -70,16 +80,16 @@ export default function AdminDashboard() {
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
 
-  // Orders state
   const [orders, setOrders] = useState<DbOrder[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
   const [expandedOrder, setExpandedOrder] = useState<number | null>(null);
 
-  // Contact requests state
   const [contacts, setContacts] = useState<DbContactRequest[]>([]);
   const [loadingContacts, setLoadingContacts] = useState(true);
 
-  // Site settings state
+  const [customers, setCustomers] = useState<DbCustomer[]>([]);
+  const [loadingCustomers, setLoadingCustomers] = useState(true);
+
   const [siteSettings, setSiteSettings] = useState<SiteSettings | null>(null);
   const [loadingSettings, setLoadingSettings] = useState(true);
   const [savingSettings, setSavingSettings] = useState(false);
@@ -96,6 +106,7 @@ export default function AdminDashboard() {
       loadProducts();
       loadOrders();
       loadContacts();
+      loadCustomers();
       loadSettings();
     })();
   }, [router]);
@@ -105,19 +116,23 @@ export default function AdminDashboard() {
     setProducts(await fetchAllProductsForAdmin());
     setLoadingProducts(false);
   }
-
   async function loadOrders() {
     setLoadingOrders(true);
     setOrders(await fetchOrders());
     setLoadingOrders(false);
   }
-
   async function loadContacts() {
     setLoadingContacts(true);
     setContacts(await fetchContactRequests());
     setLoadingContacts(false);
   }
-
+  async function loadCustomers() {
+    setLoadingCustomers(true);
+    const supabase = createClient();
+    const { data } = await supabase.from("customers").select("*").order("created_at", { ascending: false });
+    setCustomers((data as DbCustomer[]) || []);
+    setLoadingCustomers(false);
+  }
   async function loadSettings() {
     setLoadingSettings(true);
     setSiteSettings(await fetchSettings());
@@ -205,9 +220,13 @@ export default function AdminDashboard() {
     await updateOrderStatus(id, status);
     loadOrders();
   }
-
   async function handlePaymentStatus(id: number, payment_status: string) {
     await updatePaymentStatus(id, payment_status);
+    loadOrders();
+  }
+  async function handleDeleteOrder(id: number) {
+    if (!confirm("Бұл тапсырысты жоюға сенімдісіз бе?")) return;
+    await deleteOrder(id);
     loadOrders();
   }
 
@@ -238,17 +257,10 @@ export default function AdminDashboard() {
     URL.revokeObjectURL(url);
   }
 
-  async function handleDeleteOrder(id: number) {
-    if (!confirm("Бұл тапсырысты жоюға сенімдісіз бе?")) return;
-    await deleteOrder(id);
-    loadOrders();
-  }
-
   async function handleContactStatus(id: number, status: string) {
     await updateContactStatus(id, status);
     loadContacts();
   }
-
   async function handleDeleteContact(id: number) {
     if (!confirm("Бұл хабарламаны жоюға сенімдісіз бе?")) return;
     await deleteContactRequest(id);
@@ -283,7 +295,7 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      <div className="flex gap-2 mb-8 border-b border-line">
+      <div className="flex gap-2 mb-8 border-b border-line overflow-x-auto">
         <TabButton active={tab === "products"} onClick={() => setTab("products")}>
           Өнімдер ({products.length})
         </TabButton>
@@ -292,6 +304,9 @@ export default function AdminDashboard() {
         </TabButton>
         <TabButton active={tab === "contacts"} onClick={() => setTab("contacts")}>
           Хабарламалар {newContactsCount > 0 && <Badge count={newContactsCount} />}
+        </TabButton>
+        <TabButton active={tab === "customers"} onClick={() => setTab("customers")}>
+          Клиенттер ({customers.length})
         </TabButton>
         <TabButton active={tab === "settings"} onClick={() => setTab("settings")}>
           Баптаулар
@@ -306,7 +321,6 @@ export default function AdminDashboard() {
             <StatCard label="Жалпы қор" value={String(totalStock)} />
             <StatCard label="Қор құны" value={totalValue.toLocaleString("ru-RU") + " ₸"} />
           </div>
-
           <div className="bg-white border border-line rounded-2xl overflow-hidden">
             <div className="px-5 py-4 border-b border-line font-bold">Өнімдер тізімі</div>
             {loadingProducts ? (
@@ -401,25 +415,13 @@ export default function AdminDashboard() {
                         ))}
                       </div>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <select
-                          value={o.status}
-                          onChange={(e) => handleOrderStatus(o.id, e.target.value)}
-                          className="px-3 py-2 rounded-lg border border-line text-xs"
-                        >
+                        <select value={o.status} onChange={(e) => handleOrderStatus(o.id, e.target.value)} className="px-3 py-2 rounded-lg border border-line text-xs">
                           {ORDER_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
                         </select>
-                        <select
-                          value={o.payment_status}
-                          onChange={(e) => handlePaymentStatus(o.id, e.target.value)}
-                          className="px-3 py-2 rounded-lg border border-line text-xs"
-                        >
+                        <select value={o.payment_status} onChange={(e) => handlePaymentStatus(o.id, e.target.value)} className="px-3 py-2 rounded-lg border border-line text-xs">
                           {PAYMENT_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
                         </select>
-                        <a
-                          href={`https://wa.me/${o.phone.replace(/[^0-9]/g, "")}`}
-                          target="_blank"
-                          className="bg-[#25D366] text-white rounded-full px-4 py-2 text-xs font-bold"
-                        >
+                        <a href={`https://wa.me/${o.phone.replace(/[^0-9]/g, "")}`} target="_blank" className="bg-[#25D366] text-white rounded-full px-4 py-2 text-xs font-bold">
                           WhatsApp жазу
                         </a>
                         <button
@@ -478,26 +480,48 @@ export default function AdminDashboard() {
                   </div>
                   <p className="text-sm text-ink-soft mb-3 bg-bg-gray rounded-xl p-3">{c.message}</p>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <select
-                      value={c.status}
-                      onChange={(e) => handleContactStatus(c.id, e.target.value)}
-                      className="px-3 py-2 rounded-lg border border-line text-xs"
-                    >
+                    <select value={c.status} onChange={(e) => handleContactStatus(c.id, e.target.value)} className="px-3 py-2 rounded-lg border border-line text-xs">
                       <option value="new">Жаңа</option>
                       <option value="read">Оқылды</option>
                       <option value="replied">Жауап берілді</option>
                     </select>
-                    <a
-                      href={`https://wa.me/${c.phone.replace(/[^0-9]/g, "")}`}
-                      target="_blank"
-                      className="bg-[#25D366] text-white rounded-full px-4 py-2 text-xs font-bold"
-                    >
+                    <a href={`https://wa.me/${c.phone.replace(/[^0-9]/g, "")}`} target="_blank" className="bg-[#25D366] text-white rounded-full px-4 py-2 text-xs font-bold">
                       WhatsApp жазу
                     </a>
                     <button onClick={() => handleDeleteContact(c.id)} className="text-coral font-bold text-xs ml-auto">
                       Жою
                     </button>
                   </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === "customers" && (
+        <div className="bg-white border border-line rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-line font-bold">Тіркелген клиенттер</div>
+          {loadingCustomers ? (
+            <div className="p-8 text-center text-ink-soft text-sm">Жүктелуде...</div>
+          ) : customers.length === 0 ? (
+            <div className="p-8 text-center text-ink-soft text-sm">Әлі тіркелген клиент жоқ.</div>
+          ) : (
+            <div className="divide-y divide-line">
+              {customers.map((c) => (
+                <div key={c.id} className="p-4 flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-full bg-bg-gray flex items-center justify-center overflow-hidden flex-shrink-0">
+                    {c.avatar_url ? (
+                      <img src={c.avatar_url} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-xl">👤</span>
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-bold text-sm">{c.name || "Аты жоқ"}</div>
+                    <div className="text-xs text-ink-soft">{c.email} {c.phone ? `· ${c.phone}` : ""}</div>
+                  </div>
+                  <div className="text-xs text-ink-soft">{new Date(c.created_at).toLocaleDateString("ru-RU")}</div>
                 </div>
               ))}
             </div>
@@ -516,84 +540,38 @@ export default function AdminDashboard() {
           ) : (
             <form onSubmit={handleSaveSettings} className="grid gap-3.5">
               <Field label="Телефон">
-                <input
-                  value={siteSettings.phone}
-                  onChange={(e) => setSiteSettings({ ...siteSettings, phone: e.target.value })}
-                  className="input"
-                />
+                <input value={siteSettings.phone} onChange={(e) => setSiteSettings({ ...siteSettings, phone: e.target.value })} className="input" />
               </Field>
               <Field label="WhatsApp (нөмір, мыс. +77001234567)">
-                <input
-                  value={siteSettings.whatsapp}
-                  onChange={(e) => setSiteSettings({ ...siteSettings, whatsapp: e.target.value })}
-                  className="input"
-                />
+                <input value={siteSettings.whatsapp} onChange={(e) => setSiteSettings({ ...siteSettings, whatsapp: e.target.value })} className="input" />
               </Field>
               <Field label="Telegram (мыс. @abagroup)">
-                <input
-                  value={siteSettings.telegram}
-                  onChange={(e) => setSiteSettings({ ...siteSettings, telegram: e.target.value })}
-                  className="input"
-                />
+                <input value={siteSettings.telegram} onChange={(e) => setSiteSettings({ ...siteSettings, telegram: e.target.value })} className="input" />
               </Field>
               <Field label="Email">
-                <input
-                  value={siteSettings.email}
-                  onChange={(e) => setSiteSettings({ ...siteSettings, email: e.target.value })}
-                  className="input"
-                />
+                <input value={siteSettings.email} onChange={(e) => setSiteSettings({ ...siteSettings, email: e.target.value })} className="input" />
               </Field>
               <Field label="Мекенжай">
-                <input
-                  value={siteSettings.address}
-                  onChange={(e) => setSiteSettings({ ...siteSettings, address: e.target.value })}
-                  className="input"
-                />
+                <input value={siteSettings.address} onChange={(e) => setSiteSettings({ ...siteSettings, address: e.target.value })} className="input" />
               </Field>
               <Field label="Жұмыс уақыты">
-                <input
-                  value={siteSettings.hours}
-                  onChange={(e) => setSiteSettings({ ...siteSettings, hours: e.target.value })}
-                  className="input"
-                />
+                <input value={siteSettings.hours} onChange={(e) => setSiteSettings({ ...siteSettings, hours: e.target.value })} className="input" />
               </Field>
 
               <div className="font-bold mt-3 mb-1">Жеткізу тарифі</div>
-              <p className="text-xs text-ink-soft mb-2">
-                Тапсырыс кезінде клиенттің қаласы осы қалаға сай келсе — жергілікті тариф, өзгесінде — басқа қала тарифі қолданылады.
-              </p>
               <Field label="Жергілікті қала атауы">
-                <input
-                  value={siteSettings.local_city}
-                  onChange={(e) => setSiteSettings({ ...siteSettings, local_city: e.target.value })}
-                  className="input"
-                />
+                <input value={siteSettings.local_city} onChange={(e) => setSiteSettings({ ...siteSettings, local_city: e.target.value })} className="input" />
               </Field>
               <div className="grid grid-cols-2 gap-3.5">
                 <Field label="Жергілікті жеткізу ақысы (₸)">
-                  <input
-                    type="number"
-                    value={siteSettings.delivery_fee_local}
-                    onChange={(e) => setSiteSettings({ ...siteSettings, delivery_fee_local: Number(e.target.value) })}
-                    className="input"
-                  />
+                  <input type="number" value={siteSettings.delivery_fee_local} onChange={(e) => setSiteSettings({ ...siteSettings, delivery_fee_local: Number(e.target.value) })} className="input" />
                 </Field>
                 <Field label="Басқа қала жеткізу ақысы (₸)">
-                  <input
-                    type="number"
-                    value={siteSettings.delivery_fee_other}
-                    onChange={(e) => setSiteSettings({ ...siteSettings, delivery_fee_other: Number(e.target.value) })}
-                    className="input"
-                  />
+                  <input type="number" value={siteSettings.delivery_fee_other} onChange={(e) => setSiteSettings({ ...siteSettings, delivery_fee_other: Number(e.target.value) })} className="input" />
                 </Field>
               </div>
               <Field label="Тегін жеткізу шегі (₸, 0 = өшірулі)">
-                <input
-                  type="number"
-                  value={siteSettings.delivery_free_threshold}
-                  onChange={(e) => setSiteSettings({ ...siteSettings, delivery_free_threshold: Number(e.target.value) })}
-                  className="input"
-                />
+                <input type="number" value={siteSettings.delivery_free_threshold} onChange={(e) => setSiteSettings({ ...siteSettings, delivery_free_threshold: Number(e.target.value) })} className="input" />
               </Field>
 
               <div className="flex items-center gap-3 mt-2">
@@ -677,7 +655,7 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
   return (
     <button
       onClick={onClick}
-      className={`px-4 py-3 text-sm font-bold border-b-2 transition flex items-center gap-1.5 ${
+      className={`px-4 py-3 text-sm font-bold border-b-2 transition flex items-center gap-1.5 whitespace-nowrap ${
         active ? "border-deep-green text-deep-green" : "border-transparent text-ink-soft"
       }`}
     >

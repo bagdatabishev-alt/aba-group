@@ -52,6 +52,9 @@ export default function Navbar() {
                 </button>
               ))}
             </div>
+            <Link href="/account" className="w-10 h-10 rounded-xl bg-bg-gray flex items-center justify-center text-lg">
+              👤
+            </Link>
             <button
               onClick={() => setCartOpen(true)}
               className="relative w-10 h-10 rounded-xl bg-bg-gray flex items-center justify-center text-lg"

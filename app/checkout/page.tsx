@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLang } from "@/lib/i18n/LanguageContext";
 import { useCart } from "@/lib/cart/CartContext";
@@ -8,6 +8,7 @@ import { useProducts } from "@/lib/products/ProductsContext";
 import { useSettings } from "@/lib/settings/SettingsContext";
 import { calculateDeliveryFee } from "@/lib/supabase/settings";
 import { printInvoice } from "@/lib/invoice/generateInvoice";
+import { getCurrentCustomerSession, fetchMyProfile } from "@/lib/supabase/customerAuth";
 
 function fmt(n: number) {
   return n.toLocaleString("ru-RU") + " ₸";
@@ -22,6 +23,7 @@ export default function CheckoutPage() {
 
   const [loading, setLoading] = useState(false);
   const [orderNumber, setOrderNumber] = useState<number | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const [lastOrderData, setLastOrderData] = useState<{
     items: { id: number; name: string; price: number; qty: number }[];
     total: number;
@@ -31,6 +33,24 @@ export default function CheckoutPage() {
     createdAt: string;
   } | null>(null);
   const [form, setForm] = useState({ name: "", phone: "", email: "", country: "Қазақстан", city: "", address: "", notes: "" });
+
+  useEffect(() => {
+    (async () => {
+      const session = await getCurrentCustomerSession();
+      if (session) {
+        setUserId(session.user.id);
+        const profile = await fetchMyProfile();
+        if (profile) {
+          setForm((prev) => ({
+            ...prev,
+            name: profile.name || prev.name,
+            phone: profile.phone || prev.phone,
+            email: profile.email || prev.email,
+          }));
+        }
+      }
+    })();
+  }, []);
 
   const ids = Object.keys(cart).map(Number);
   const subtotal = ids.reduce((sum, id) => {
@@ -64,7 +84,7 @@ export default function CheckoutPage() {
       const res = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, items, total: cartTotal, deliveryFee }),
+        body: JSON.stringify({ ...form, items, total: cartTotal, deliveryFee, userId }),
       });
       const data = await res.json();
       const num = data.orderNumber ?? 1000;
@@ -107,6 +127,11 @@ export default function CheckoutPage() {
           <button onClick={() => router.push("/track")} className="border border-deep-green text-deep-green rounded-full px-6 py-3 font-bold">
             {t("track_order_btn")}
           </button>
+          {userId && (
+            <button onClick={() => router.push("/account")} className="border border-deep-green text-deep-green rounded-full px-6 py-3 font-bold">
+              👤 Кабинетім
+            </button>
+          )}
           <button onClick={() => router.push("/")} className="bg-deep-green text-white rounded-full px-6 py-3 font-bold">
             {t("nav_home")}
           </button>
@@ -118,6 +143,13 @@ export default function CheckoutPage() {
   return (
     <section className="py-14 px-5 max-w-2xl mx-auto">
       <h2 className="font-display text-2xl font-extrabold mb-6">{t("co_title")}</h2>
+
+      {!userId && (
+        <div className="bg-blue/10 text-deep-green rounded-xl p-3.5 text-sm mb-5 flex items-center justify-between flex-wrap gap-2">
+          <span>Тіркелсеңіз тапсырыс тарихыңызды кабинетте көре аласыз</span>
+          <button onClick={() => router.push("/account")} className="font-bold underline">Кіру / Тіркелу</button>
+        </div>
+      )}
 
       <div className="bg-bg-gray rounded-2xl p-5 mb-6">
         {ids.map((id) => {
